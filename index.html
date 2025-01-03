@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Stream</title>
+</head>
+<body>
+    <h1>WebSocket Stream</h1>
+    <div>
+        <h2>Live Webcam Preview</h2>
+        <video id="webcam-preview" autoplay playsinline></video>
+    </div>
+    <script>
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                const videoElement = document.getElementById("webcam-preview");
+                videoElement.srcObject = stream;
+                videoElement.play();
+
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+
+                const socket = new WebSocket("ws://localhost:8000/ws");
+
+                socket.onopen = () => {
+                    console.log("WebSocket connection established");
+
+                    function captureAndSendFrame() {
+                        canvas.width = videoElement.videoWidth;
+                        canvas.height = videoElement.videoHeight;
+
+                        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+                        canvas.toBlob(blob => {
+                            if (socket.readyState === WebSocket.OPEN) {
+                                socket.send(blob); // Send frame as binary data
+                            }
+                        }, "image/jpeg");
+
+                        setTimeout(captureAndSendFrame, 33); // ~30 fps
+                    }
+
+                    captureAndSendFrame();
+                };
+
+                socket.onerror = error => console.error("WebSocket error:", error);
+                socket.onclose = () => console.log("WebSocket connection closed");
+            })
+            .catch(error => console.error("Error accessing webcam:", error));
+    </script>
+</body>
+</html>
